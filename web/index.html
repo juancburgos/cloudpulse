@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CloudPulse — App de portafolio: arquitectura cloud en producción</title>
+<meta name="description" content="CloudPulse: app Android de portafolio que consulta una API real en producción (FastAPI + PostgreSQL + Caddy + Docker), lista para explicar arquitectura cloud.">
+<style>
+  :root{--bg:#0b1220;--card:#111a2e;--line:#1e2a44;--txt:#e6edf7;--muted:#8fa3bf;--acc:#38bdf8;--ok:#34d399;--warn:#fbbf24;--bad:#f87171;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--txt);font-family:'Segoe UI',system-ui,-apple-system,sans-serif;line-height:1.6}
+  .wrap{max-width:960px;margin:0 auto;padding:24px 20px 80px}
+  header{display:flex;align-items:center;gap:14px;padding:28px 0;border-bottom:1px solid var(--line);margin-bottom:28px}
+  .logo{width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,#0ea5e9,#6366f1);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:24px;color:#fff;box-shadow:0 8px 24px rgba(56,189,248,.25)}
+  h1{font-size:1.7rem;font-weight:700}
+  .sub{color:var(--muted);font-size:.95rem}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin:20px 0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
+  .card h3{font-size:.78rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px}
+  .big{font-size:1.6rem;font-weight:700}
+  .pill{display:inline-block;padding:2px 10px;border-radius:999px;font-size:.75rem;font-weight:600}
+  .ok{background:rgba(52,211,153,.15);color:var(--ok)} .down{background:rgba(248,113,113,.15);color:var(--bad)} .warn{background:rgba(251,191,36,.15);color:var(--warn)}
+  section{margin:34px 0}
+  h2{font-size:1.2rem;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  p{color:#c4d2e6}
+  .arch{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;overflow-x:auto}
+  pre{font-size:.8rem;color:#bcd3ee;white-space:pre}
+  code{background:#0d1626;border:1px solid var(--line);border-radius:6px;padding:1px 7px;font-size:.85em;color:#93c5fd}
+  ul{padding-left:22px;color:#c4d2e6}
+  li{margin:6px 0}
+  a{color:var(--acc);text-decoration:none}
+  footer{border-top:1px solid var(--line);margin-top:44px;padding-top:18px;color:var(--muted);font-size:.85rem;display:flex;gap:18px;flex-wrap:wrap}
+  .status-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;background:var(--muted)}
+  .status-dot.on{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+  .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+  #live{font-size:.85rem;color:var(--muted);text-align:right}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">◈</div>
+    <div>
+      <h1>CloudPulse</h1>
+      <div class="sub">App Android de portafolio: una API real en producción, de punta a punta.</div>
+    </div>
+  </header>
+
+  <div class="grid">
+    <div class="card"><h3>Estado de la API</h3><div class="big" id="s-status"><span class="status-dot"></span>Consultando…</div></div>
+    <div class="card"><h3>Base de datos</h3><div class="big" id="s-db">—</div></div>
+    <div class="card"><h3>Pings registrados</h3><div class="big" id="s-pings">—</div></div>
+    <div class="card"><h3>Región / host</h3><div class="big" id="s-region" style="font-size:1.1rem">—</div></div>
+  </div>
+  <div id="live">última lectura: —</div>
+
+  <section>
+    <h2>🧭 ¿Qué es CloudPulse?</h2>
+    <p>CloudPulse es una app Android <b>sencilla a propósito</b>, construida como pieza de portafolio para demostrar una
+    arquitectura de producción completa. Desde el teléfono hace <b>ping a su propia API</b> (que vive en un VPS real),
+    la API escribe en <b>PostgreSQL</b> y devuelve el estado del sistema. Sirve para explicar, componente por componente,
+    cómo se monta y opera un servicio en la nube.</p>
+  </section>
+
+  <section>
+    <h2>🏗️ Arquitectura</h2>
+    <div class="arch"><pre>
+┌────────────┐   HTTPS/TLS   ┌───────────┐   HTTP   ┌─────────────┐    SQL    ┌──────────────┐
+│  App       │ ────────────► │  Caddy    │ ──────►  │  API        │ ────────► │  PostgreSQL  │
+│  Android   │               │ (proxy +  │          │  FastAPI     │           │  (Docker,    │
+│  (Kotlin)  │               │  certs)   │          │  (Docker)    │           │   volumen)   │
+└────────────┘               └───────────┘          └─────────────┘           └──────────────┘
+      │                            │                       │                        │
+      └── /api/v1/status, /api/v1/ping (POST)             healthz                   volumen
+</pre></div>
+    <ul style="margin-top:12px">
+      <li><b>Cliente:</b> app Android nativa (Kotlin, Material 3) con manejo de errores y reintento.</li>
+      <li><b>Edge:</b> Caddy — terminación TLS automática (Let's Encrypt), reverse proxy.</li>
+      <li><b>Aplicación:</b> FastAPI (Python) en contenedor Docker, endpoints <span class="mono">/healthz</span>, <span class="mono">/api/v1/status</span>, <span class="mono">POST /api/v1/ping</span>.</li>
+      <li><b>Datos:</b> PostgreSQL 16 en contenedor con volumen persistente; healthcheck del contenedor.</li>
+      <li><b>Operación:</b> <span class="mono">docker compose</span> para desplegar/re-desplegar; configuración 100% portable a cualquier VPS.</li>
+      <li><b>Observabilidad:</b> endpoint de salud + estado en vivo (este sitio lo consulta).</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>📲 La app</h2>
+    <p>CloudPulse está publicada en Google Play (enlace abajo). Muestra tarjetas de estado en vivo, un botón
+    <b>“Enviar ping”</b> que escribe en la base de datos y un historial de pings — todo contra la API real.</p>
+    <p style="margin-top:10px"><a href="https://play.google.com/store/apps/details?id=com.juancarlosburgos.cloudpulse">▶ Ver en Google Play</a> &nbsp;·&nbsp;
+    <a href="/privacidad.html">Política de privacidad</a> &nbsp;·&nbsp; <a href="https://api.juancarlosburgosautor.com/docs">Documentación de la API (Swagger)</a></p>
+  </section>
+
+  <footer>
+    <span>CloudPulse — proyecto de portafolio · Juan Carlos Burgos · Arquitecto de Soluciones Cloud</span>
+  </footer>
+</div>
+<script>
+const API = "https://api.juancarlosburgosautor.com";
+async function load(){
+  try{
+    const r = await fetch(API + "/api/v1/status", {cache:"no-store"});
+    const d = await r.json();
+    const el = (id,v)=>document.getElementById(id).textContent = v;
+    const statusEl = document.getElementById("s-status");
+    if(d.status === "ok"){ statusEl.innerHTML = '<span class="status-dot on"></span>Operativo'; }
+    else { statusEl.innerHTML = '<span class="status-dot" style="background:var(--warn)"></span>Degradado'; }
+    el("s-db", (d.database && d.database.status==="up" ? "Conectada" : "Caída"));
+    el("s-pings", d.database ? (d.database.total_pings ?? "—") : "—");
+    el("s-region", (d.server ? d.server.region + " · " + d.server.hostname : "—"));
+    document.getElementById("live").textContent = "última lectura: " + new Date(d.time||Date.now()).toLocaleString("es-CO") + " · v" + d.version;
+  }catch(e){
+    document.getElementById("s-status").innerHTML = '<span class="status-dot" style="background:var(--warn)"></span>Sin conexión';
+    document.getElementById("s-db").textContent = "—";
+    document.getElementById("live").textContent = "no se pudo contactar la API ("+new Date().toLocaleString("es-CO")+")";
+  }
+}
+load(); setInterval(load, 15000);
+</script>
+</body>
+</html>

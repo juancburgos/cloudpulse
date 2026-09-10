@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Política de privacidad — CloudPulse</title>
+<style>
+  body{background:#0b1220;color:#e6edf7;font-family:'Segoe UI',system-ui,sans-serif;line-height:1.7;margin:0}
+  .wrap{max-width:760px;margin:0 auto;padding:40px 20px 90px}
+  h1{font-size:1.5rem;margin-bottom:6px}
+  .meta{color:#8fa3bf;font-size:.85rem;margin-bottom:28px}
+  h2{font-size:1.05rem;margin:24px 0 8px;color:#7dd3fc}
+  p,li{color:#c4d2e6;font-size:.95rem}
+  a{color:#38bdf8}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Política de privacidad — CloudPulse</h1>
+  <div class="meta">Última actualización: 9 de septiembre de 2026</div>
+
+  <p><b>Resumen:</b> CloudPulse es una aplicación de demostración/portafolio. <b>No recopila, almacena ni comparte ningún dato personal.</b></p>
+
+  <h2>1. Qué hace la aplicación</h2>
+  <p>CloudPulse muestra el estado operativo de su propia API de demostración y permite enviar un "ping" (un contador con marca de tiempo) que se guarda en una base de datos. La aplicación no requiere crear cuenta, no pide nombre, correo, ubicación ni contactos, y no muestra publicidad.</p>
+
+  <h2>2. Datos que se procesan</h2>
+  <p>Cuando usas la aplicación, se envía una petición HTTPS a la API. El servidor guarda únicamente datos técnicos no personales del ping: la fecha/hora y una cadena corta de identificación del cliente (cabecera <i>User-Agent</i> del dispositivo), usada solo para depuración. No se recopila información que permita identificarte.</p>
+
+  <h2>3. Almacenamiento</h2>
+  <p>Los registros de ping se almacenan en una base de datos PostgreSQL del proveedor de nube que aloja la API, exclusivamente con fines de demostración técnica. Pueden borrarse en cualquier momento sin afectar el funcionamiento de la aplicación.</p>
+
+  <h2>4. Permisos</h2>
+  <p>La aplicación solo necesita acceso a Internet. No solicita ningún otro permiso del dispositivo.</p>
+
+  <h2>5. Servicios de terceros</h2>
+  <p>No se usan analíticas, anuncios ni SDK de terceros que recopilen datos.</p>
+
+  <h2>6. Contacto</h2>
+  <p>Dudas sobre esta política: <span id="mail"></span></p>
+
+  <script>document.getElementById('mail').textContent = 'juancarlosburgos.dev' + String.fromCharCode(64) + 'gmail.com';</script>
+</div>
+</body>
+</html>
