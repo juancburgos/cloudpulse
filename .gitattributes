@@ -1,0 +1,19 @@
+# Normalise line endings across platforms; keep binaries binary.
+* text=auto eol=lf
+
+# Windows helper scripts keep CRLF so they run in cmd.exe
+*.bat text eol=crlf
+
+# Binaries
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.jar binary
+*.keystore binary
+*.aab binary
+*.apk binary
+
+# Generated or vendored material is not part of the source-language statistics
+docs/** linguist-documentation
+screenshots/** linguist-documentation
