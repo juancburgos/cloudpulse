@@ -54,3 +54,6 @@ play-package/builds/
 
 # Local Google Play release workspace (keystores, bundles, store assets already live in screenshots/)
 play-package/
+
+# Local agent tooling / keys (never commit private material)
+.ssh-agent/
