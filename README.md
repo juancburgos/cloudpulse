@@ -132,6 +132,8 @@ cd android
 - [x] Cloud-portable: no provider-specific primitives, migration documented and timed
 - [x] Privacy: no accounts, no ads, no analytics, no personal data collected
 - [x] Documented runbook for deploy, rollback, backup and incident response
+- [x] GitHub-native security enabled: secret scanning, Dependabot alerts + security updates, CodeQL
+      default setup and private vulnerability reporting (see `.github/` and `SECURITY.md`)
 
 ---
 

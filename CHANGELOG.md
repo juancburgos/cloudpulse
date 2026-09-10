@@ -13,6 +13,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - `GET /api/v1/pings` is now covered by unit tests (the fake cursor implements `fetchall`).
 - CI installs `backend/requirements-dev.txt`, so the `TestClient` dependency (`httpx`) is present.
 
+### Security
+- Enabled the GitHub-native security stack on this public repository: secret scanning (it flagged
+  nothing), Dependabot alerts and security updates, CodeQL default setup, and private vulnerability
+  reporting so a report never has to be filed as a public issue.
+
 ### Planned
 - External uptime monitoring with alerting on the `db` field
 - Scheduled database backups (script exists, cron entry pending)
