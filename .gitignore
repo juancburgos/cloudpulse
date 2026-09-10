@@ -1,0 +1,53 @@
+# ---- Secrets and local configuration (never commit) ----
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+keystore.properties
+service-account*.json
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+
+# ---- Android / Gradle ----
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+android/captures/
+android/.cxx/
+*.apk
+*.aab
+*.ap_
+*.dex
+android/app/release/
+
+# ---- Node / tooling ----
+node_modules/
+.npm/
+*.log
+
+# ---- Editors and OS ----
+.idea/
+.vscode/
+*.iml
+*.swp
+.DS_Store
+Thumbs.db
+
+# ---- Local artifacts that should not live in git ----
+play-package/keys/
+play-package/builds/
+/tmp/
