@@ -21,7 +21,7 @@ Thanks for looking. This repository is primarily a portfolio/teaching artifact, 
 ## Development setup
 
 ```bash
-git clone https://github.com/USER/cloudpulse.git
+git clone https://github.com/juancburgos/cloudpulse.git
 cd cloudpulse
 cp .env.example .env
 make up        # api + db in Docker

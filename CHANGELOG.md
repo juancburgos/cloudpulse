@@ -40,5 +40,5 @@ First public release: the demo app, its API, and the deployment are live and doc
 - TLS enforced end-to-end; no cleartext traffic allowed by the client.
 - No personal data collected: no accounts, no analytics, no advertising identifiers.
 
-[Unreleased]: https://github.com/USER/cloudpulse/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/USER/cloudpulse/releases/tag/v1.0.0
+[Unreleased]: https://github.com/juancburgos/cloudpulse/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/juancburgos/cloudpulse/releases/tag/v1.0.0

@@ -4,7 +4,7 @@
 > Built as a portfolio piece to explain — component by component — how a service is designed, deployed,
 > observed, secured and migrated between cloud providers.
 
-[![CI](https://github.com/USER/cloudpulse/actions/workflows/ci.yml/badge.svg)](../../actions/workflows/ci.yml)
+[![CI](https://github.com/juancburgos/cloudpulse/actions/workflows/ci.yml/badge.svg)](../../actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![API](https://img.shields.io/badge/API-live-brightgreen)](https://api.juancarlosburgosautor.com/healthz)
 [![Google Play](https://img.shields.io/badge/Google%20Play-internal%20testing-blue)](https://play.google.com/apps/internaltest/4701233828689047702)
@@ -95,7 +95,7 @@ curl -s -X POST https://api.juancarlosburgosautor.com/api/v1/ping
 ### Backend + database (any machine with Docker)
 
 ```bash
-git clone https://github.com/USER/cloudpulse.git && cd cloudpulse
+git clone https://github.com/juancburgos/cloudpulse.git && cd cloudpulse
 cp .env.example .env          # set DB_PASSWORD and REGION
 make up                       # docker compose up -d --build
 make smoke                    # curl the health endpoint
