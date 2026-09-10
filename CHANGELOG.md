@@ -6,6 +6,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Fixed
+- **API startup is no longer fatal when PostgreSQL is not ready yet.** The schema bootstrap is
+  deferred with a warning instead of killing the process, and the next successful health probe
+  retries it — a database that arrives late used to take the whole API down with it.
+- `GET /api/v1/pings` is now covered by unit tests (the fake cursor implements `fetchall`).
+- CI installs `backend/requirements-dev.txt`, so the `TestClient` dependency (`httpx`) is present.
+
 ### Planned
 - External uptime monitoring with alerting on the `db` field
 - Scheduled database backups (script exists, cron entry pending)

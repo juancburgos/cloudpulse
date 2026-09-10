@@ -29,6 +29,19 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://cloudpulse:cloudpulse@db:
 
 STARTED_AT = datetime.now(UTC)
 
+
+class _BootState:
+    """Process state that outlives a request: whether the schema has been created yet.
+
+    Held in an object rather than a module-level boolean so the health probe can update it
+    without a ``global`` statement.
+    """
+
+    schema_ready = False
+
+
+_BOOT = _BootState()
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS pings (
     id         BIGSERIAL PRIMARY KEY,
@@ -73,9 +86,20 @@ def _db_connect() -> psycopg.Connection:
 
 
 def _init_db() -> None:
-    with _db_connect() as conn, conn.cursor() as cur:
-        cur.execute(SCHEMA)
-        conn.commit()
+    """Create the schema if it is missing.
+
+    Deliberately non-fatal: if PostgreSQL is not ready yet, the process must still start and
+    answer ``/healthz`` with ``db: down`` instead of crash-looping. The next health probe that
+    reaches the database retries the bootstrap (ADR-0004).
+    """
+    try:
+        with _db_connect() as conn, conn.cursor() as cur:
+            cur.execute(SCHEMA)
+            conn.commit()
+    except Exception as exc:  # noqa: BLE001 - a slow database must not block startup
+        print("schema bootstrap deferred, database not ready:", exc)
+        return
+    _BOOT.schema_ready = True
 
 
 def _db_latency_ms() -> float:
@@ -115,6 +139,9 @@ def healthz() -> dict:
         db_state = "up"
     except Exception:  # noqa: BLE001 - any failure means "dependency down"
         db_state = "down"
+    else:
+        if not _BOOT.schema_ready:  # the database just became reachable: finish the boot
+            _init_db()
     return {
         "status": "ok" if db_state == "up" else "degraded",
         "db": db_state,

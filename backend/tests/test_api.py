@@ -24,25 +24,31 @@ class FakeCursor:
     """Answers the handful of SQL statements the API issues."""
 
     def __init__(self) -> None:
-        self._result: tuple | None = None
+        self._rows: list[tuple] = []
 
     def execute(self, sql: str, params: tuple | None = None) -> None:  # noqa: ARG002
         statement = " ".join(sql.lower().split())
         if "select 1" in statement:
-            self._result = (1,)
+            self._rows = [(1,)]
         elif "insert into pings" in statement:
-            self._result = (42, FAKE_ROW_TIME)
+            self._rows = [(42, FAKE_ROW_TIME)]
         elif "count(*)" in statement:
-            self._result = (7,)
+            self._rows = [(7,)]
         elif "max(created_at)" in statement:
-            self._result = (FAKE_ROW_TIME,)
+            self._rows = [(FAKE_ROW_TIME,)]
         elif statement.startswith("select id, source, created_at"):
-            self._result = (1, "pytest-agent", FAKE_ROW_TIME)
+            self._rows = [
+                (1, "pytest-agent", FAKE_ROW_TIME),
+                (2, "android-client", FAKE_ROW_TIME),
+            ]
         else:  # pragma: no cover - guards against silent SQL changes
-            self._result = None
+            self._rows = []
 
     def fetchone(self) -> tuple | None:
-        return self._result
+        return self._rows[0] if self._rows else None
+
+    def fetchall(self) -> list[tuple]:
+        return list(self._rows)
 
     def __enter__(self) -> FakeCursor:
         return self
@@ -75,6 +81,16 @@ class BrokenConnection(FakeConnection):
         return BrokenCursor()
 
 
+class FlakyConnection(FakeConnection):
+    """Unreachable until ``healthy`` is flipped, to exercise recovery without a restart."""
+
+    def __init__(self) -> None:
+        self.healthy = False
+
+    def cursor(self) -> FakeCursor:
+        return FakeCursor() if self.healthy else BrokenCursor()
+
+
 def working_connection() -> FakeConnection:
     return FakeConnection()
 
@@ -95,6 +111,14 @@ def degraded_client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
     """A client whose database is unreachable, to assert the degraded contract."""
     monkeypatch.setattr(main, "_db_connect", broken_connection)
     with TestClient(main.app) as test_client:
+        yield test_client
+
+
+@pytest.fixture()
+def degraded_caller(monkeypatch: pytest.MonkeyPatch) -> TestClient:
+    """Same broken database, but the HTTP contract is the subject: no re-raised exceptions."""
+    monkeypatch.setattr(main, "_db_connect", broken_connection)
+    with TestClient(main.app, raise_server_exceptions=False) as test_client:
         yield test_client
 
 
@@ -157,6 +181,7 @@ def test_pings_history_is_bounded(client: TestClient) -> None:
     assert response.status_code == 200
     entries = response.json()["pings"]
     assert isinstance(entries, list)
+    assert len(entries) == 2
     assert entries[0]["source"] == "pytest-agent"
 
 
@@ -167,3 +192,35 @@ def test_pings_clamps_numeric_limits_and_rejects_non_numeric(
     response = client.get(f"/api/v1/pings?limit={limit}")
     # Non-numeric values fail validation (422); out-of-range numbers are clamped, never rejected.
     assert response.status_code in (200, 422)
+
+
+def test_ping_reports_a_clean_500_instead_of_leaking_a_traceback(
+    degraded_caller: TestClient,
+) -> None:
+    """A failing write must return the documented error body, never an HTML crash page."""
+    response = degraded_caller.post("/api/v1/ping")
+    assert response.status_code == 500
+    assert response.json() == {"status": "error", "detail": "internal_error"}
+
+
+def test_schema_bootstrap_retries_when_the_database_arrives_late(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Boot must survive a database that is not ready yet, and catch up on a later probe."""
+    monkeypatch.setattr(main._BOOT, "schema_ready", False)
+    connection = FlakyConnection()
+
+    def connect() -> FlakyConnection:
+        return connection
+
+    monkeypatch.setattr(main, "_db_connect", connect)
+
+    with TestClient(main.app) as late_client:
+        # The API is up even though nothing could be bootstrapped at startup.
+        booting = late_client.get("/healthz").json()
+        assert (booting["status"], booting["db"]) == ("degraded", "down")
+        assert main._BOOT.schema_ready is False
+
+        connection.healthy = True
+        assert late_client.get("/healthz").json()["db"] == "up"
+        assert main._BOOT.schema_ready is True
