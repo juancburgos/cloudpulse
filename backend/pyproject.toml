@@ -1,0 +1,26 @@
+[project]
+name = "cloudpulse-backend"
+version = "1.0.0"
+description = "CloudPulse API - FastAPI service exposing live system status (portfolio/demo)"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = [
+    "ignore::DeprecationWarning:fastapi",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "C4", "RET", "PTH", "ARG", "PL"]
+ignore = [
+    "PLR0913",   # too many arguments (test helpers)
+    "PLR2004",   # magic values in tests are fine
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["ARG001", "ARG002", "S101"]
