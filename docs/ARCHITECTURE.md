@@ -128,6 +128,8 @@ compliance isolation requirements. None of those exist at this size — see ADR-
 | Threat | Mitigation |
 |---|---|
 | Public database scan/brute force | No published port; strong password via environment; internal Docker network only |
+| Abuse of the public write endpoint | Per-address rate limit in process, `429` + `Retry-After` (ADR-0005) |
+| Compromised API container | Unprivileged user (uid 10001), read-only root filesystem, `no-new-privileges`, no database port |
 | Secret leakage via git | `.env`, keystores and tokens are git-ignored; `.env.example` documents the shape, never the value |
 | Abuse of the write endpoint | Public by design (no auth for the demo); rate limiting is the first roadmap item if abuse appears |
 | MITM on the client | TLS with publicly trusted certificates; no cleartext fallback in the app |

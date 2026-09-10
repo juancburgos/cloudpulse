@@ -6,6 +6,13 @@ services:
     image: cloudpulse-api:1.0.0
     container_name: cloudpulse-api
     restart: unless-stopped
+    # The image is immutable at runtime: the process runs as an unprivileged user, cannot escalate
+    # through setuid binaries, and nothing writes to disk except the tmpfs on /tmp.
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
     environment:
       - APP_VERSION=1.0.0
       - REGION=${REGION:-us-east-1}

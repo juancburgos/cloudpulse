@@ -14,7 +14,9 @@ trigger that would justify it — nothing is here "because production systems ha
 - [x] **Rate limit on `POST /api/v1/ping`** (the only public write) — in process, per client address, with the
       proxy-header subtlety documented in ADR-0005.
 
-- [ ] **Non-root container user** and a read-only root filesystem for the API image.
+- [x] **Non-root container user** and a read-only root filesystem for the API image — `USER app`
+      (uid 10001), `read_only: true`, `tmpfs: /tmp`, `no-new-privileges`. Verified live: the process
+      cannot write to its own code.
 - [ ] **Android unit tests in CI** (currently only the backend is covered by the pipeline).
 
 ## Next (v1.1) — observability and cost transparency

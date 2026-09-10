@@ -127,11 +127,14 @@ cd android
 - [x] TLS everywhere, certificates renewed automatically
 - [x] Database not exposed publicly; only the proxy is
 - [x] Container healthchecks + restart policy
-- [x] Stateless API (scales horizontally by construction)
+- [x] Stateless API (scales horizontally by construction), metered write path (`429` over quota)
+- [x] API container runs as an unprivileged user on a read-only root filesystem
+- [x] Nightly database backups with a **restore drill executed and recorded**
 - [x] Structured health/status endpoint consumed by the client
 - [x] Zero secrets in the repository (`.env`, keystores and tokens are git-ignored)
 - [x] Cloud-portable: no provider-specific primitives, migration documented and timed
 - [x] Privacy: no accounts, no ads, no analytics, no personal data collected
+- [x] External uptime probe every 15 minutes, alerting into the issue tracker
 - [x] Documented runbook for deploy, rollback, backup and incident response
 - [x] GitHub-native security enabled: secret scanning, Dependabot alerts + security updates, CodeQL
       default setup and private vulnerability reporting (see `.github/` and `SECURITY.md`)

@@ -23,6 +23,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - **Scheduled database backups** on the host, plus a recorded **restore drill** in the runbook
   (33 rows in production → 33 rows restored into a disposable container, ~0.5 s).
 
+### Changed
+- The API container now runs as an unprivileged user (`uid 10001`) on a **read-only root filesystem**
+  with `no-new-privileges` and a `tmpfs` on `/tmp`. Verified live: the process cannot write to its own
+  code (it does not need to — it is stateless by construction).
+
 ### Security
 - Documented the host hardening the live instance actually enforces (key-only SSH with the drop-in
   ordering gotcha, fail2ban, and the fact that Docker publishes ports past 
