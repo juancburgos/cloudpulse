@@ -5,9 +5,11 @@
 
 ## Estado actual (sept 2026)
 
-- VPS Hostinger `2.25.125.53` (srv1948046, KVM 2, 2 vCPU / 7.8 GB RAM / 96 GB disco).
+- VPS Hostinger (srv1948046, KVM 2, 2 vCPU / 7.8 GB RAM / 96 GB disco). La IP concreta no se publica:
+  está en el inventario privado del proyecto; usa la tuya al seguir esta guía.
 - Caduca el **2026-10-01** → hay que migrar o renovar antes de esa fecha.
-- Contenido: Caddy (proxy/TLS), n8n, `cloudpulse` stack (api+db), sitios estáticos, agente dsh.
+- Contenido: Caddy (proxy/TLS) + el stack `cloudpulse` (api+db) + sitios estáticos + servicios internos
+  con permisos de operación (no son parte de este repositorio).
 
 ## Paso 1 — Elegir el proveedor nuevo
 
@@ -27,7 +29,7 @@ Recomendado para esta carga: **Hetzner CX22** o el **CPX11 (~€3.5)** — el st
 curl -fsSL https://get.docker.com | sh
 
 # 2) copiar el stack desde el VPS actual
-rsync -av root@2.25.125.53:/opt/cloudpulse /opt/
+rsync -av root@TU_IP_ACTUAL:/opt/cloudpulse /opt/
 # (o desde la laptop: /home/uses/Descargas/cloudpulse/backend + deploy/)
 
 # 3) levantar api + db
@@ -78,5 +80,5 @@ Abrir la app CloudPulse → debería mostrar el estado en vivo contra el nuevo s
 - [ ] Caddy configurado
 - [ ] DNS actualizado (api + cloudpulse)
 - [ ] Verificado healthz/status público
-- [ ] n8n / otros servicios migrados (opcional; mismo patrón)
+- [ ] otros servicios internos del host migrados (opcional; mismo patrón)
 - [ ] VPS Hostinger dado de baja (o no renovado el 2026-10-01)

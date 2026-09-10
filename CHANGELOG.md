@@ -14,6 +14,40 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - CI installs `backend/requirements-dev.txt`, so the `TestClient` dependency (`httpx`) is present.
 
 ### Security
+- Documented the host hardening the live instance actually enforces (key-only SSH with the drop-in
+  ordering gotcha, fail2ban, and the fact that Docker publishes ports past 
+Usage: ufw COMMAND
+
+Commands:
+ enable                          enables the firewall
+ disable                         disables the firewall
+ default ARG                     set default policy
+ logging LEVEL                   set logging to LEVEL
+ allow ARGS                      add allow rule
+ deny ARGS                       add deny rule
+ reject ARGS                     add reject rule
+ limit ARGS                      add limit rule
+ delete RULE|NUM                 delete RULE
+ insert NUM RULE                 insert RULE at NUM
+ prepend RULE                    prepend RULE
+ route RULE                      add route RULE
+ route delete RULE|NUM           delete route RULE
+ route insert NUM RULE           insert route RULE at NUM
+ reload                          reload firewall
+ reset                           reset firewall
+ status                          show firewall status
+ status numbered                 show firewall status as numbered list of RULES
+ status verbose                  show verbose firewall status
+ show ARG                        show firewall report
+ version                         display version information
+
+Application profile commands:
+ app list                        list application profiles
+ app info PROFILE                show information on PROFILE
+ app update PROFILE              update PROFILE
+ app default ARG                 set default application policy) in the runbook.
+- Removed the host's IP address from the public docs: the live service is identified by its hostname,
+  which is the only detail a reader of this repository needs.
 - Enabled the GitHub-native security stack on this public repository: secret scanning (it flagged
   nothing), Dependabot alerts and security updates, CodeQL default setup, and private vulnerability
   reporting so a report never has to be filed as a public issue.

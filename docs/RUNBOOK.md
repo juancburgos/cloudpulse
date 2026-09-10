@@ -6,7 +6,7 @@ Audience: whoever is on call (currently one person). Everything here is copy-pas
 
 | Thing | Value |
 |---|---|
-| Host | VPS (Ubuntu 24.04), any provider — currently `2.25.125.53` |
+| Host | VPS (Ubuntu 24.04), any provider — the live instance is behind `api.juancarlosburgosautor.com` |
 | Project path on the host | `/opt/cloudpulse` |
 | Compose stack | `cloudpulse-api` (FastAPI, `127.0.0.1:8001`), `cloudpulse-db` (PostgreSQL, no published port) |
 | Edge proxy | `caddy-caddy-1` (Caddy 2, host network, owns 80/443) |
@@ -145,7 +145,27 @@ The client targets a **hostname**, so the app in the store never needs an update
 
 Measured: ~20–30 minutes, dominated by DNS propagation. Nothing in the stack is provider-specific.
 
-## 8. Incident response (minimal, but written down)
+## 8. Host hardening (what the live host actually enforces)
+
+Verified on the running instance, not aspirational:
+
+| Control | State |
+|---|---|
+| SSH authentication | **Public key only.** `PasswordAuthentication no`, `PermitRootLogin prohibit-password`, `MaxAuthTries 3` in `/etc/ssh/sshd_config.d/00-hardening.conf` |
+| Why the file is named `00-` | In `sshd_config` the **first** value of a keyword wins, so a drop-in must sort *before* the cloud image's `50-cloud-init.conf` — otherwise `PasswordAuthentication yes` there silently wins |
+| Brute-force protection | `fail2ban`, sshd jail: 4 failures in 10 minutes → 1 hour ban; the operator's own address is in `ignoreip` so a typo cannot lock them out |
+| Firewall | `ufw` allows 22/80/443 only — but remember **Docker publishes ports past `ufw`** (it inserts its own iptables rules), which is how a container port can be reachable while `ufw` says it is closed |
+| Container ports | Every service that does not need the internet binds to `127.0.0.1` (`8001` here; the proxy runs with `network_mode: host`, so it still reaches it) |
+
+Audit one-liners:
+
+```bash
+sudo sshd -T | grep -E '^(passwordauthentication|permitrootlogin|maxauthtries)'
+sudo fail2ban-client status sshd
+sudo ss -tlnp | awk '{print $4}' | grep -v '^127\.'   # anything NOT on loopback demands justification
+```
+
+## 9. Incident response (minimal, but written down)
 
 1. **Detect** — external monitor / user report / `docker compose ps`.
 2. **Stabilise** — restore service first (restart, rollback, or fail the status page over), diagnose after.
@@ -153,7 +173,7 @@ Measured: ~20–30 minutes, dominated by DNS propagation. Nothing in the stack i
 4. **Learn** — open an issue with timeline and root cause; if the fix is a process change, update this runbook
    or add an ADR. A post-mortem that changes nothing is theatre.
 
-## 9. Useful one-liners
+## 10. Useful one-liners
 
 ```bash
 # Who is listening on 80/443?
