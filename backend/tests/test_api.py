@@ -1,22 +1,23 @@
 """Unit tests for the CloudPulse API.
 
-These tests exercise the real endpoints with a **fake database connection**, so they run in milliseconds and
-need no infrastructure. The contract against a real PostgreSQL is covered by ``test_integration.py``.
+These tests exercise the real endpoints with a **fake database connection**, so they run in
+milliseconds and need no infrastructure. The contract against a real PostgreSQL is covered by
+``test_integration.py``.
 
-The fake mimics exactly the surface ``app.main`` uses: ``psycopg.connect()`` returning a context manager with
-``cursor()`` (also a context manager), ``fetchone()`` and ``commit()``.
+The fake mimics exactly the surface ``app.main`` uses: ``psycopg.connect()`` returning a context
+manager with ``cursor()`` (also a context manager), ``fetchone()`` and ``commit()``.
 """
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from fastapi.testclient import TestClient
 
 from app import main
 
-FAKE_ROW_TIME = datetime(2026, 9, 9, 22, 33, 41, tzinfo=timezone.utc)
+FAKE_ROW_TIME = datetime(2026, 9, 9, 22, 33, 41, tzinfo=UTC)
 
 
 class FakeCursor:
@@ -43,7 +44,7 @@ class FakeCursor:
     def fetchone(self) -> tuple | None:
         return self._result
 
-    def __enter__(self) -> "FakeCursor":
+    def __enter__(self) -> FakeCursor:
         return self
 
     def __exit__(self, *exc: object) -> bool:
@@ -57,21 +58,34 @@ class FakeConnection:
     def commit(self) -> None:  # pragma: no cover - trivial
         return None
 
-    def __enter__(self) -> "FakeConnection":
+    def __enter__(self) -> FakeConnection:
         return self
 
     def __exit__(self, *exc: object) -> bool:
         return False
 
 
-class BrokenConnection(FakeConnection):
-    def cursor(self) -> FakeCursor:  # type: ignore[override]
+class BrokenCursor(FakeCursor):
+    def execute(self, sql: str, params: tuple | None = None) -> None:
         raise RuntimeError("database is gone")
+
+
+class BrokenConnection(FakeConnection):
+    def cursor(self) -> FakeCursor:
+        return BrokenCursor()
+
+
+def working_connection() -> FakeConnection:
+    return FakeConnection()
+
+
+def broken_connection() -> BrokenConnection:
+    return BrokenConnection()
 
 
 @pytest.fixture()
 def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
-    monkeypatch.setattr(main, "_db_connect", lambda: FakeConnection())
+    monkeypatch.setattr(main, "_db_connect", working_connection)
     with TestClient(main.app) as test_client:
         yield test_client
 
@@ -79,7 +93,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
 @pytest.fixture()
 def degraded_client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
     """A client whose database is unreachable, to assert the degraded contract."""
-    monkeypatch.setattr(main, "_db_connect", lambda: BrokenConnection())
+    monkeypatch.setattr(main, "_db_connect", broken_connection)
     with TestClient(main.app) as test_client:
         yield test_client
 
@@ -100,7 +114,7 @@ def test_healthz_reports_ok_when_database_answers(client: TestClient) -> None:
 
 
 def test_healthz_degrades_but_stays_200_when_database_is_down(degraded_client: TestClient) -> None:
-    """Documented convention (ADR-0004): degradation travels in the body, not in the status code."""
+    """Documented convention (ADR-0004): degradation travels in the body, not the status code."""
     response = degraded_client.get("/healthz")
     assert response.status_code == 200
     body = response.json()
@@ -147,7 +161,9 @@ def test_pings_history_is_bounded(client: TestClient) -> None:
 
 
 @pytest.mark.parametrize("limit", [0, -1, 999, "abc"])
-def test_pings_rejects_out_of_range_limit(client: TestClient, limit: object) -> None:
+def test_pings_clamps_numeric_limits_and_rejects_non_numeric(
+    client: TestClient, limit: object
+) -> None:
     response = client.get(f"/api/v1/pings?limit={limit}")
-    # A non-numeric value fails validation (422); out-of-range numbers are clamped, never rejected.
+    # Non-numeric values fail validation (422); out-of-range numbers are clamped, never rejected.
     assert response.status_code in (200, 422)

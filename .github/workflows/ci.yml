@@ -14,9 +14,9 @@ jobs:
     name: Backend (tests + lint)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
           cache: pip
@@ -57,9 +57,9 @@ jobs:
       APP_VERSION: ci
       REGION: ci-local
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
           cache: pip
@@ -78,9 +78,9 @@ jobs:
     name: Android (assemble debug)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
@@ -90,8 +90,11 @@ jobs:
       - name: Install SDK platform
         run: sdkmanager "platforms;android-36" "build-tools;36.0.0" > /dev/null
 
+      # Uses the repository's Gradle wrapper, so CI runs exactly the version the project pins.
       - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: wrapper
 
       - name: Assemble debug APK
         working-directory: android
-        run: gradle assembleDebug --no-daemon
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
