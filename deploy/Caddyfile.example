@@ -1,0 +1,26 @@
+# CloudPulse — example Caddyfile
+# Copy to /etc/caddy/Caddyfile (or mount it into the Caddy container) and replace the domain.
+#
+# Caddy obtains and renews Let's Encrypt certificates automatically, so there is nothing else to run.
+
+# --- API: reverse proxy to the locally bound FastAPI service -----------------
+api.example.com {
+	reverse_proxy 127.0.0.1:8001
+	encode gzip
+	log {
+		output file /var/log/caddy/api.log
+		format json
+	}
+}
+
+# --- Landing page + privacy policy (static files) ----------------------------
+cloudpulse.example.com {
+	root * /srv/cloudpulse-web
+	file_server
+	encode gzip
+}
+
+# --- Optional: identical content on the apex, redirected ---------------------
+# example.com {
+#	redir https://cloudpulse.example.com{uri} permanent
+# }

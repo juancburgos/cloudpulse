@@ -1,0 +1,36 @@
+# CloudPulse stack — portable a cualquier VPS (Hetzner, DigitalOcean, etc.)
+# Uso:  docker compose up -d --build
+services:
+  api:
+    build: ./backend
+    image: cloudpulse-api:1.0.0
+    container_name: cloudpulse-api
+    restart: unless-stopped
+    environment:
+      - APP_VERSION=1.0.0
+      - REGION=${REGION:-us-east-1}
+      - DATABASE_URL=postgresql://cloudpulse:${DB_PASSWORD:-cloudpulse_dev}@db:5432/cloudpulse
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8001:8000"   # solo local; Caddy hace de proxy público
+
+  db:
+    image: postgres:16-alpine
+    container_name: cloudpulse-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=cloudpulse
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-cloudpulse_dev}
+      - POSTGRES_DB=cloudpulse
+    volumes:
+      - cloudpulse_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cloudpulse -d cloudpulse"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  cloudpulse_pgdata:
