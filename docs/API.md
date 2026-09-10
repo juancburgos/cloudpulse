@@ -98,6 +98,17 @@ curl -s -X POST https://api.juancarlosburgosautor.com/api/v1/ping
 
 **500** — `{"status":"error","detail":"internal_error"}` when the database is unavailable.
 
+**429** — rate limited. The endpoint is public and every call costs a row, so it is metered per client
+address (`RATE_LIMIT_MAX` per `RATE_LIMIT_WINDOW_S`, default 20 per 60 s — see ADR-0005):
+
+```json
+{ "status": "throttled", "detail": "rate_limit_exceeded", "limit": 20, "window_s": 60 }
+```
+
+The response carries `Retry-After` (seconds). The client address is read from the right-most
+`X-Forwarded-For` entry, which is the one Caddy vouches for; a caller-supplied prefix is ignored, so
+inventing a new address per request does not buy a new quota.
+
 ---
 
 ## `GET /api/v1/pings?limit=10`

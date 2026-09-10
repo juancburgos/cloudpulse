@@ -13,6 +13,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - `GET /api/v1/pings` is now covered by unit tests (the fake cursor implements `fetchall`).
 - CI installs `backend/requirements-dev.txt`, so the `TestClient` dependency (`httpx`) is present.
 
+### Added
+- **Rate limiting on the only public write endpoint** (`POST /api/v1/ping`): per client address, in
+  process, `429` + `Retry-After` when exceeded. Rationale, alternatives and the accepted
+  per-worker caveat in `docs/ADR/0005-in-process-rate-limiting.md`.
+- **Uptime monitor with alerting** (`.github/workflows/monitor.yml`): every 15 minutes it runs the real
+  smoke test against production and opens — and later closes — a labelled issue when the service is
+  unhealthy. Alerting via the issue tracker means no third-party account and no extra secret.
+- **Scheduled database backups** on the host, plus a recorded **restore drill** in the runbook
+  (33 rows in production → 33 rows restored into a disposable container, ~0.5 s).
+
 ### Security
 - Documented the host hardening the live instance actually enforces (key-only SSH with the drop-in
   ordering gotcha, fail2ban, and the fact that Docker publishes ports past 

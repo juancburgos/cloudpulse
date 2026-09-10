@@ -12,6 +12,7 @@ See ``docs/ARCHITECTURE.md`` for the full picture and ``docs/ADR/`` for the deci
 
 import os
 import platform
+import threading
 import time
 import uuid
 from collections.abc import AsyncIterator
@@ -27,6 +28,10 @@ APP_VERSION = os.getenv("APP_VERSION", "1.0.0")
 REGION = os.getenv("REGION", "us-east-1")
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://cloudpulse:cloudpulse@db:5432/cloudpulse")
 
+# The only write endpoint is public and unauthenticated, so it is metered per client address.
+RATE_LIMIT_MAX = int(os.getenv("RATE_LIMIT_MAX", "20"))
+RATE_LIMIT_WINDOW_S = float(os.getenv("RATE_LIMIT_WINDOW_S", "60"))
+
 STARTED_AT = datetime.now(UTC)
 
 
@@ -41,6 +46,74 @@ class _BootState:
 
 
 _BOOT = _BootState()
+
+
+class RateLimiter:
+    """Fixed-window request counter, per client, held in process memory (ADR-0005).
+
+    Deliberately not Redis: the API runs as one container on one host, and the goal is to keep a
+    public write endpoint from being used as a free database filler, not to bill traffic per user.
+    Becoming multi-instance is the point at which this decision has to be revisited, and ADR-0005
+    says so explicitly.
+    """
+
+    def __init__(self, limit: int, window_s: float, max_keys: int = 10_000) -> None:
+        self._limit = limit
+        self._window_s = window_s
+        self._max_keys = max_keys
+        self._hits: dict[str, tuple[float, int]] = {}
+        self._lock = threading.Lock()
+
+    def check(self, key: str, now: float | None = None) -> tuple[bool, int]:
+        """Register one hit for ``key``. Returns ``(allowed, retry_after_seconds)``."""
+        current = time.monotonic() if now is None else now
+        with self._lock:
+            window_start, count = self._hits.get(key, (current, 0))
+            if current - window_start >= self._window_s:
+                window_start, count = current, 0
+            count += 1
+            self._hits[key] = (window_start, count)
+
+            if len(self._hits) > self._max_keys:
+                self._prune(current)
+
+            if count > self._limit:
+                return False, max(1, int(window_start + self._window_s - current) + 1)
+        return True, 0
+
+    def _prune(self, now: float) -> None:
+        """Drop expired windows: bounds memory when many distinct addresses call in."""
+        stale = [k for k, (start, _) in self._hits.items() if now - start >= self._window_s]
+        for key in stale:
+            del self._hits[key]
+        if not stale:  # every window is live: a burst from many distinct addresses, so reset
+            self._hits.clear()
+
+    @property
+    def tracked_clients(self) -> int:
+        """How many client windows are currently held, so the bound is observable and testable."""
+        return len(self._hits)
+
+
+_limiter = RateLimiter(RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_S)
+
+
+def _client_ip(request: Request) -> str:
+    """Client address, honouring the proxy header.
+
+    Caddy either appends the peer it saw to a caller-supplied ``X-Forwarded-For`` or overwrites it
+    with that peer; in both cases the **right-most** entry is the address the proxy vouched for,
+    while the left-most is whatever the caller typed. Reading the first entry would let any client
+    choose its own bucket — and therefore never be throttled.
+
+    Direct calls that bypass the proxy (tests, local curl) have no header and fall back to the
+    socket peer; in production that path does not exist, because the API is bound to loopback.
+    """
+    forwarded = request.headers.get("x-forwarded-for", "")
+    if forwarded:
+        return forwarded.split(",")[-1].strip()
+    return request.client.host if request.client else "unknown"
+
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS pings (
@@ -190,9 +263,32 @@ def status() -> dict:
     }
 
 
-@app.post("/api/v1/ping", status_code=201)
-def create_ping(request: Request) -> dict:
-    """Write one row and report the resulting total: the write *and* read paths in one call."""
+@app.post(
+    "/api/v1/ping",
+    status_code=201,
+    # The handler returns either the created payload or a 429 envelope, so there is no single
+    # response model for FastAPI to infer from the annotation.
+    response_model=None,
+    responses={429: {"description": "Rate limit exceeded"}},
+)
+def create_ping(request: Request) -> dict | JSONResponse:
+    """Write one row and report the resulting total: the write *and* read paths in one call.
+
+    Metered per client address (ADR-0005): this endpoint is public and every call costs a row.
+    """
+    allowed, retry_after = _limiter.check(_client_ip(request))
+    if not allowed:
+        return JSONResponse(
+            status_code=429,
+            content={
+                "status": "throttled",
+                "detail": "rate_limit_exceeded",
+                "limit": RATE_LIMIT_MAX,
+                "window_s": int(RATE_LIMIT_WINDOW_S),
+            },
+            headers={"Retry-After": str(retry_after)},
+        )
+
     source = request.headers.get("User-Agent", "unknown")[:120] or "unknown"
     ping_id = str(uuid.uuid4())[:8]
 

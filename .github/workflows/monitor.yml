@@ -1,0 +1,94 @@
+name: Monitor
+
+# Uptime monitoring with alerting, using the repository's own issue tracker as the pager.
+# Rationale: an alerting channel that needs a third-party account and a secret is an alerting channel
+# that will be silently disabled the day the trial ends. This one is free, versioned and auditable.
+#
+# Known limitation (documented, not hidden): GitHub disables scheduled workflows on repositories with
+# no activity for 60 days, and scheduled runs can be delayed under load. Cron here means "every 15
+# minutes, best effort" — enough for a portfolio, not a substitute for a real pager.
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+env:
+  API_URL: https://api.juancarlosburgosautor.com
+  LANDING_URL: https://cloudpulse.juancarlosburgosautor.com
+
+jobs:
+  probe:
+    name: Probe production
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Run the smoke test against the live service
+        id: smoke
+        run: ./scripts/smoke-test.sh
+        env:
+          API_URL: ${{ env.API_URL }}
+        continue-on-error: true
+
+      - name: Check the public landing page
+        id: landing
+        run: |
+          code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$LANDING_URL")"
+          echo "landing HTTP ${code}"
+          [ "$code" = "200" ] || exit 1
+        continue-on-error: true
+
+      - name: Open or update an incident issue
+        if: steps.smoke.outcome == 'failure' || steps.landing.outcome == 'failure'
+        uses: actions/github-script@v7
+        env:
+          SMOKE: ${{ steps.smoke.outcome }}
+          LANDING: ${{ steps.landing.outcome }}
+        with:
+          script: |
+            const label = 'uptime';
+            const title = 'Production probe failing';
+            const body = [
+              `The scheduled probe of ${process.env.API_URL} failed.`,
+              '',
+              `- smoke test: **${process.env.SMOKE}**`,
+              `- landing page: **${process.env.LANDING}**`,
+              `- run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              '',
+              'Triage order from `docs/RUNBOOK.md`: check `/healthz` first, then `docker compose ps` on the host.',
+            ].join('\n');
+
+            const existing = await github.rest.issues.listForRepo({
+              ...context.repo, state: 'open', labels: label,
+            });
+            if (existing.data.length > 0) {
+              await github.rest.issues.createComment({
+                ...context.repo, issue_number: existing.data[0].number, body,
+              });
+            } else {
+              await github.rest.issues.create({ ...context.repo, title, body, labels: [label] });
+            }
+
+      - name: Close the incident issue once production is healthy again
+        if: steps.smoke.outcome == 'success' && steps.landing.outcome == 'success'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const open = await github.rest.issues.listForRepo({
+              ...context.repo, state: 'open', labels: 'uptime',
+            });
+            for (const issue of open.data) {
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: issue.number,
+                body: `Recovered: the probe passes again as of ${new Date().toISOString()}.`,
+              });
+              await github.rest.issues.update({
+                ...context.repo, issue_number: issue.number, state: 'closed',
+              });
+            }

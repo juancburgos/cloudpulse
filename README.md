@@ -5,6 +5,7 @@
 > observed, secured and migrated between cloud providers.
 
 [![CI](https://github.com/juancburgos/cloudpulse/actions/workflows/ci.yml/badge.svg)](../../actions/workflows/ci.yml)
+[![Monitor](https://github.com/juancburgos/cloudpulse/actions/workflows/monitor.yml/badge.svg)](../../actions/workflows/monitor.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![API](https://img.shields.io/badge/API-live-brightgreen)](https://api.juancarlosburgosautor.com/healthz)
 [![Google Play](https://img.shields.io/badge/Google%20Play-internal%20testing-blue)](https://play.google.com/apps/internaltest/4701233828689047702)

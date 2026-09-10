@@ -5,12 +5,16 @@ trigger that would justify it — nothing is here "because production systems ha
 
 ## Now (v1.0.x) — hardening the demonstrator
 
-- [ ] **External uptime monitor** on `/healthz`, alerting on the `db` field (the smallest real improvement:
-      right now nobody is told if the host dies).
-- [ ] **Scheduled backups** — enable the cron entry for `scripts/backup-db.sh` and record one successful
-      restore drill in this repository.
+- [x] **External uptime monitor** on `/healthz`, alerting on the `db` field — a scheduled workflow runs
+      `scripts/smoke-test.sh` against production and opens a labelled issue when it fails
+      (`.github/workflows/monitor.yml`). Alerting rides the repository's own issue tracker: no third-party
+      account, no extra secret.
+- [x] **Scheduled backups** — daily cron on the host plus a **restore drill recorded in the runbook**
+      (a backup nobody restored is a hypothesis, not a backup).
+- [x] **Rate limit on `POST /api/v1/ping`** (the only public write) — in process, per client address, with the
+      proxy-header subtlety documented in ADR-0005.
+
 - [ ] **Non-root container user** and a read-only root filesystem for the API image.
-- [ ] **Rate limit on `POST /api/v1/ping`** (the only public write) — a proxy-level limit is enough.
 - [ ] **Android unit tests in CI** (currently only the backend is covered by the pipeline).
 
 ## Next (v1.1) — observability and cost transparency

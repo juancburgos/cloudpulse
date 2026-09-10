@@ -93,20 +93,44 @@ sudo docker exec cloudpulse-db pg_dump -U cloudpulse cloudpulse \
   | gzip > /var/backups/cloudpulse-$(date +%F-%H%M).sql.gz
 ```
 
-`scripts/backup-db.sh` does exactly this (and prunes files older than 14 days). Schedule it with cron:
+`scripts/backup-db.sh` does exactly this (and prunes files older than 14 days). Installed on the live host as
+`/etc/cron.d/cloudpulse-backup`:
 
 ```cron
-15 3 * * * /opt/cloudpulse/scripts/backup-db.sh >> /var/log/cloudpulse-backup.log 2>&1
+# CloudPulse: daily database dump, 14-day retention
+15 3 * * * root /opt/cloudpulse/scripts/backup-db.sh >> /var/log/cloudpulse-backup.log 2>&1
 ```
 
-**Restore** (drill this before you need it)
+**Restore** — restore into a *throwaway* container first, never straight into production:
 
 ```bash
-gunzip -c /var/backups/cloudpulse-2026-09-09-0315.sql.gz \
-  | sudo docker exec -i cloudpulse-db psql -U cloudpulse -d cloudpulse
-curl -s https://api.<domain>/api/v1/status | python3 -c \
-  'import json,sys;print("pings:",json.load(sys.stdin)["database"]["total_pings"])'
+# 1. bring up a disposable PostgreSQL and wait for it
+sudo docker run -d --name cp-restore-drill \
+  -e POSTGRES_PASSWORD=drill -e POSTGRES_USER=cloudpulse -e POSTGRES_DB=cloudpulse postgres:16-alpine
+until sudo docker exec cp-restore-drill pg_isready -U cloudpulse -d cloudpulse | grep -q accepting; do sleep 2; done
+
+# 2. replay the dump into it
+gunzip -c /var/backups/cloudpulse-<stamp>.sql.gz | sudo docker exec -i cp-restore-drill psql -U cloudpulse -d cloudpulse
+
+# 3. compare with production, then destroy the drill
+sudo docker exec cp-restore-drill psql -U cloudpulse -d cloudpulse -tAc 'select count(*) from pings'
+sudo docker exec cloudpulse-db    psql -U cloudpulse -d cloudpulse -tAc 'select count(*) from pings'
+sudo docker rm -f cp-restore-drill
 ```
+
+**Restore drill record — 2026-09-10 (executed, not planned)**
+
+| Step | Result |
+|---|---|
+| Dump produced | `/var/backups/cloudpulse-2026-09-10-1804.sql.gz`, exit 0 |
+| Rows in production | 33 |
+| Rows after restore into a disposable container | 33 — identical |
+| Schema present after restore | yes (`pings` table recreated from the dump) |
+| Time to restore | **~0.5 s** for this dataset (a 4 KB dump; not extrapolatable, and said so on purpose) |
+| Drill container | removed afterwards; production was never touched |
+
+The number that matters is not the 0.5 s, it is that the restore path is known to work: the first time you
+run it should not be during an incident.
 
 **What data loss actually means here:** the only table is `pings` (a timestamp and a user-agent string per
 demo write). Losing it degrades the demo, not the business — this is why a nightly dump on the same host is

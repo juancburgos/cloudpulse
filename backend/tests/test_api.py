@@ -224,3 +224,90 @@ def test_schema_bootstrap_retries_when_the_database_arrives_late(
         connection.healthy = True
         assert late_client.get("/healthz").json()["db"] == "up"
         assert main._BOOT.schema_ready is True
+
+
+def test_rate_limiter_allows_up_to_the_limit_and_then_refuses() -> None:
+    """The counter is exclusive at the limit: the (limit + 1)th call in a window is refused."""
+    limiter = main.RateLimiter(limit=3, window_s=60)
+
+    for _ in range(3):
+        allowed, retry_after = limiter.check("203.0.113.9", now=100.0)
+        assert allowed is True
+        assert retry_after == 0
+
+    allowed, retry_after = limiter.check("203.0.113.9", now=100.0)
+    assert allowed is False
+    assert retry_after >= 1
+
+
+def test_rate_limiter_forgets_a_window_once_it_expires() -> None:
+    limiter = main.RateLimiter(limit=1, window_s=30)
+
+    assert limiter.check("198.51.100.4", now=0.0)[0] is True
+    assert limiter.check("198.51.100.4", now=10.0)[0] is False
+    assert limiter.check("198.51.100.4", now=31.0)[0] is True  # new window, counter reset
+
+
+def test_rate_limiter_tracks_clients_independently() -> None:
+    limiter = main.RateLimiter(limit=1, window_s=60)
+
+    assert limiter.check("198.51.100.1", now=5.0)[0] is True
+    assert limiter.check("198.51.100.2", now=5.0)[0] is True  # a neighbour is not punished
+    assert limiter.check("198.51.100.1", now=5.0)[0] is False
+
+
+def test_rate_limiter_bounds_its_own_memory() -> None:
+    """A wide spread of addresses must not grow the table without bound."""
+    limiter = main.RateLimiter(limit=1, window_s=60, max_keys=50)
+
+    for i in range(200):
+        limiter.check(f"198.51.100.{i}", now=float(i))
+
+    assert limiter.tracked_clients <= 50
+
+
+def test_ping_is_throttled_with_429_and_retry_after(client: TestClient) -> None:
+    """End to end: the public write endpoint answers 429, with the header a client can obey."""
+    temporary = main.RateLimiter(limit=2, window_s=60)
+    original = main._limiter
+    main._limiter = temporary
+    try:
+        assert client.post("/api/v1/ping").status_code == 201
+        assert client.post("/api/v1/ping").status_code == 201
+        throttled = client.post("/api/v1/ping")
+        assert throttled.status_code == 429
+        assert throttled.json()["status"] == "throttled"
+        assert int(throttled.headers["retry-after"]) >= 1
+    finally:
+        main._limiter = original
+
+
+def test_throttling_follows_the_proxy_vouched_address_and_ignores_spoofing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Behind Caddy every request arrives from the proxy, so the header carries the real client.
+
+    The left-most entry is caller-controlled, so a client that invents a new address for every
+    request must still land in the bucket of the address the proxy appended for it.
+    """
+    monkeypatch.setattr(main, "_db_connect", working_connection)
+    temporary = main.RateLimiter(limit=1, window_s=60)
+    original = main._limiter
+    main._limiter = temporary
+    try:
+        with TestClient(main.app) as forwarded_client:
+            first = forwarded_client.post(
+                "/api/v1/ping", headers={"X-Forwarded-For": "1.2.3.4, 203.0.113.9"}
+            )
+            spoofed = forwarded_client.post(
+                "/api/v1/ping", headers={"X-Forwarded-For": "5.6.7.8, 203.0.113.9"}
+            )
+            neighbour = forwarded_client.post(
+                "/api/v1/ping", headers={"X-Forwarded-For": "10.0.0.1, 203.0.113.10"}
+            )
+
+        assert first.status_code == 201
+        assert spoofed.status_code == 429  # changing the fake prefix must not buy a new bucket
+        assert neighbour.status_code == 201  # a genuinely different client is unaffected
+    finally:
+        main._limiter = original
