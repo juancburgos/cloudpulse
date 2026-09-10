@@ -54,6 +54,18 @@ Testers accept by opening `https://play.google.com/apps/testing/<applicationId>`
 and tapping *Become a tester*. Installing afterwards is not what the counter measures, but Google reviews the
 test for realism — recruiting real users who actually run the app is both the honest and the safe approach.
 
+### A silent failure worth knowing about
+
+A closed-testing release can read **"Available to selected testers"** while the track has **no testers at all**.
+The Testers tab lets you switch between *Email lists* and *Google Groups*; both save independently, and the
+switch is stored per track. If the track ends up on *Google Groups* with an empty field, the saved configuration
+is "no testers", the release still looks healthy, and the 14-day counter never starts — the first symptom would
+otherwise appear two weeks later as a production request that is refused.
+
+The lesson generalises: after saving a track configuration, **reload the page and re-read the saved state**
+rather than trusting the button you just pressed. Verify with the tester-facing artefact (the opt-in page must
+say *You are a tester* for an address on the list), not with the console's own status text.
+
 ## Store listing assets
 
 | Asset | Size | Source in this repo |
