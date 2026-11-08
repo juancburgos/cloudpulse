@@ -1,0 +1,13 @@
+android/
+screenshots/
+docs/
+play-package/
+scripts/
+Makefile
+CHANGELOG.md
+CODE_OF_CONDUCT.md
+CONTRIBUTING.md
+LICENSE
+SECURITY.md
+backend/tests/
+**/__pycache__/
