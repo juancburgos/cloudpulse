@@ -1,0 +1,15 @@
+[project]
+name = "cloudpulse-api"
+version = "1.0.0"
+description = "CloudPulse API — live health of its own stack (FastAPI + PostgreSQL)."
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi==0.115.6",
+  "uvicorn[standard]==0.34.0",
+  "psycopg[binary]==3.2.3",
+]
+
+# Vercel serverless entrypoint. The service itself lives in backend/app/main.py so the
+# container build (Dockerfile) and the serverless build share a single source of truth.
+[tool.vercel]
+entrypoint = "backend.app.main:app"
