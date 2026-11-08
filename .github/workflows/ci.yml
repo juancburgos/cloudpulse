@@ -88,10 +88,13 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - uses: android-actions/setup-android@v3
-
+      # The ubuntu-latest runner image already ships the Android command-line tools and exports
+      # ANDROID_HOME, so we only accept licenses and install the platform we build against.
+      # (android-actions/setup-android@v3 currently crashes under the runner's Node 24.)
       - name: Install SDK platform
-        run: sdkmanager "platforms;android-36" "build-tools;36.0.0" > /dev/null
+        run: |
+          yes | sdkmanager --licenses > /dev/null || true
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" > /dev/null
 
       # Uses the repository's Gradle wrapper, so CI runs exactly the version the project pins.
       - uses: gradle/actions/setup-gradle@v4
