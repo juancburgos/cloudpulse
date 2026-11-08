@@ -88,13 +88,30 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # The ubuntu-latest runner image already ships the Android command-line tools and exports
-      # ANDROID_HOME, so we only accept licenses and install the platform we build against.
-      # (android-actions/setup-android@v3 currently crashes under the runner's Node 24.)
-      - name: Install SDK platform
+      # The runner image ships the Android SDK but does not put sdkmanager on PATH, and
+      # android-actions/setup-android@v3 crashes under the runner's Node 24, so we wire the
+      # SDK up explicitly: locate cmdline-tools, export ANDROID_HOME and accept licenses.
+      - name: Set up Android SDK
         run: |
-          yes | sdkmanager --licenses > /dev/null || true
-          sdkmanager "platforms;android-36" "build-tools;36.0.0" > /dev/null
+          set -euo pipefail
+          if [ -n "$ANDROID_SDK_ROOT" ]; then SDK_ROOT="$ANDROID_SDK_ROOT";
+          elif [ -n "$ANDROID_HOME" ]; then SDK_ROOT="$ANDROID_HOME";
+          else SDK_ROOT=/usr/local/lib/android/sdk; fi
+          export ANDROID_HOME="$SDK_ROOT"
+          export ANDROID_SDK_ROOT="$SDK_ROOT"
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "$SDK_ROOT/platform-tools" >> "$GITHUB_PATH"
+          SDKMANAGER="$(command -v sdkmanager || find "$SDK_ROOT" -name sdkmanager -type f 2>/dev/null | head -1)"
+          if [ -z "$SDKMANAGER" ]; then
+            echo "sdkmanager not found under $SDK_ROOT" >&2
+            ls -la "$SDK_ROOT" >&2 || true
+            exit 1
+          fi
+          echo "Using $SDKMANAGER"
+          echo "$(dirname "$SDKMANAGER")" >> "$GITHUB_PATH"
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" "platforms;android-36" "build-tools;36.0.0"
 
       # Uses the repository's Gradle wrapper, so CI runs exactly the version the project pins.
       - uses: gradle/actions/setup-gradle@v4
